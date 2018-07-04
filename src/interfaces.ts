@@ -9,7 +9,10 @@ export interface slideData extends animationData {
 };
 
 export interface tintAnimationData extends animationData {
-    tintStep: number;
+    tintStep_RED: number;
+    tintStep_GREEN: number;
+    tintStep_BLUE: number;
+    objectToAnimate: PIXI.Sprite | PIXI.Graphics;
 };
 
 export interface graphicsConfiguration {

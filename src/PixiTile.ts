@@ -22,11 +22,11 @@ class PixiTile {
     private absY: number;
     constructor(private globalConfig: any, private APP: PIXI.Application, private _TEXTURES_LIST: PIXI.Texture[], private _value: number | string = 0) {
 
-        this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep: 0 };
-        this.graphicsType = mainGraphicType.Graphics;
+        this.graphicsType = mainGraphicType.Sprite;
         this._GRAPHICS_OBJECT = PixiTile.createTileAsGraphics(globalConfig, _value);
         this._SPRITE_OBJECT = new PIXI.Sprite(_TEXTURES_LIST[_value as number]);
-        this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._GRAPHICS_OBJECT };
+        this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._SPRITE_OBJECT };
+        this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep_RED: 0, tintStep_BLUE: 0, tintStep_GREEN: 0, objectToAnimate: this._SPRITE_OBJECT };
         this.doubleValueFilter = new GlowFilter();
         // this._SPRITE_OBJECT.filters = [this.doubleValueFilter];
 
@@ -34,6 +34,10 @@ class PixiTile {
     setSpriteMode(): void {
         this.graphicsType = mainGraphicType.Sprite;
         this._SLIDE_DATA.objectToMove = this._SPRITE_OBJECT;
+    };
+    setGraphicsMode(): void {
+        this.graphicsType = mainGraphicType.Graphics;
+        this._SLIDE_DATA.objectToMove = this._GRAPHICS_OBJECT;
     };
     createGraphics(): PixiTile {
         this._GRAPHICS_OBJECT = PixiTile.createTileAsGraphics(this.globalConfig, this._value);
@@ -79,6 +83,19 @@ class PixiTile {
         this._SLIDE_DATA.slideAmountY = 0;
         return this;
     };
+    resetAllAnimationsData(): PixiTile {
+        this._SLIDE_DATA.currentStep = 0;
+        this._SLIDE_DATA.totalSteps = 0;
+        this._SLIDE_DATA.slideAmountX = 0;
+        this._SLIDE_DATA.slideAmountY = 0;
+        this._TINT_ANIMATION_DATA.currentStep = 0;
+        this._TINT_ANIMATION_DATA.totalSteps = 0;
+        this._TINT_ANIMATION_DATA.tintStep_BLUE = 0;
+        this._TINT_ANIMATION_DATA.tintStep_GREEN = 0;
+        this._TINT_ANIMATION_DATA.tintStep_RED = 0;
+
+        return this;
+    };
     set faceValue(v: number | string) {
         /**depending on graphicsType change one of the two */
         this._value = v;
@@ -117,9 +134,40 @@ class PixiTile {
     };
     setGraphicsFaceValue() { };
     setSpriteFaceValue() { };
-    prepareAnimateTint(tint: number, steps: number): void { };
+    prepareAnimateTint(tint: number, steps: number): void {
+
+        let graphicsData = this._TINT_ANIMATION_DATA.objectToAnimate = this.graphicsType === mainGraphicType.Graphics ? this._GRAPHICS_OBJECT : this._SPRITE_OBJECT;
+        this._TINT_ANIMATION_DATA.currentStep = 0;
+        this._TINT_ANIMATION_DATA.totalSteps = steps;
+        let fillColor: number = graphicsData.tint;
+        let r = (fillColor & 0xFF0000) >> 16;
+        let g = (fillColor & 0x00FF00) >> 8;
+        let b = fillColor & 0x0000FF;
+        let tr = (tint & 0xFF0000) >> 16;
+        let tg = (tint & 0x00FF00) >> 8;
+        let tb = tint & 0x0000FF;
+
+        this._TINT_ANIMATION_DATA.tintStep_RED = (tr - r) / steps;
+        this._TINT_ANIMATION_DATA.tintStep_GREEN = (tg - g) / steps;
+        this._TINT_ANIMATION_DATA.tintStep_BLUE = (tb - b) / steps;
+
+    };
     animateTintStep(): number {
-        return 0;
+
+        let _TINT_ANIMATION_DATA = this._TINT_ANIMATION_DATA;
+        if (_TINT_ANIMATION_DATA.currentStep === _TINT_ANIMATION_DATA.totalSteps) {
+            //resetHere?
+            return 0;
+        }
+        _TINT_ANIMATION_DATA.currentStep++;
+        let objectToAnimate = _TINT_ANIMATION_DATA.objectToAnimate;
+
+        let paintTint: number =
+            (_TINT_ANIMATION_DATA.tintStep_RED << 16) + (_TINT_ANIMATION_DATA.tintStep_GREEN << 8) + _TINT_ANIMATION_DATA.tintStep_BLUE;
+
+        objectToAnimate.tint += paintTint;
+
+        return _TINT_ANIMATION_DATA.currentStep;
     };
     static createTileAsGraphics(_CONF: graphicsConfiguration, val: number | string | null) {
 

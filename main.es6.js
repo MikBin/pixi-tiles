@@ -12,16 +12,21 @@
             this.APP = APP;
             this._TEXTURES_LIST = _TEXTURES_LIST;
             this._value = _value;
-            this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep: 0 };
-            this.graphicsType = mainGraphicType.Graphics;
+            this.graphicsType = mainGraphicType.Sprite;
             this._GRAPHICS_OBJECT = PixiTile.createTileAsGraphics(globalConfig, _value);
             this._SPRITE_OBJECT = new PIXI.Sprite(_TEXTURES_LIST[_value]);
-            this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._GRAPHICS_OBJECT };
+            this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._SPRITE_OBJECT };
+            this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep_RED: 0, tintStep_BLUE: 0, tintStep_GREEN: 0, objectToAnimate: this._SPRITE_OBJECT };
             this.doubleValueFilter = new pixiFilters.GlowFilter();
         }
         setSpriteMode() {
             this.graphicsType = mainGraphicType.Sprite;
             this._SLIDE_DATA.objectToMove = this._SPRITE_OBJECT;
+        }
+        ;
+        setGraphicsMode() {
+            this.graphicsType = mainGraphicType.Graphics;
+            this._SLIDE_DATA.objectToMove = this._GRAPHICS_OBJECT;
         }
         ;
         createGraphics() {
@@ -73,6 +78,19 @@
             return this;
         }
         ;
+        resetAllAnimationsData() {
+            this._SLIDE_DATA.currentStep = 0;
+            this._SLIDE_DATA.totalSteps = 0;
+            this._SLIDE_DATA.slideAmountX = 0;
+            this._SLIDE_DATA.slideAmountY = 0;
+            this._TINT_ANIMATION_DATA.currentStep = 0;
+            this._TINT_ANIMATION_DATA.totalSteps = 0;
+            this._TINT_ANIMATION_DATA.tintStep_BLUE = 0;
+            this._TINT_ANIMATION_DATA.tintStep_GREEN = 0;
+            this._TINT_ANIMATION_DATA.tintStep_RED = 0;
+            return this;
+        }
+        ;
         set faceValue(v) {
             this._value = v;
             if (this.graphicsType === mainGraphicType.Sprite) {
@@ -118,10 +136,32 @@
         ;
         setSpriteFaceValue() { }
         ;
-        prepareAnimateTint(tint, steps) { }
+        prepareAnimateTint(tint, steps) {
+            let graphicsData = this._TINT_ANIMATION_DATA.objectToAnimate = this.graphicsType === mainGraphicType.Graphics ? this._GRAPHICS_OBJECT : this._SPRITE_OBJECT;
+            this._TINT_ANIMATION_DATA.currentStep = 0;
+            this._TINT_ANIMATION_DATA.totalSteps = steps;
+            let fillColor = graphicsData.tint;
+            let r = (fillColor & 0xFF0000) >> 16;
+            let g = (fillColor & 0x00FF00) >> 8;
+            let b = fillColor & 0x0000FF;
+            let tr = (tint & 0xFF0000) >> 16;
+            let tg = (tint & 0x00FF00) >> 8;
+            let tb = tint & 0x0000FF;
+            this._TINT_ANIMATION_DATA.tintStep_RED = (tr - r) / steps;
+            this._TINT_ANIMATION_DATA.tintStep_GREEN = (tg - g) / steps;
+            this._TINT_ANIMATION_DATA.tintStep_BLUE = (tb - b) / steps;
+        }
         ;
         animateTintStep() {
-            return 0;
+            let _TINT_ANIMATION_DATA = this._TINT_ANIMATION_DATA;
+            if (_TINT_ANIMATION_DATA.currentStep === _TINT_ANIMATION_DATA.totalSteps) {
+                return 0;
+            }
+            _TINT_ANIMATION_DATA.currentStep++;
+            let objectToAnimate = _TINT_ANIMATION_DATA.objectToAnimate;
+            let paintTint = (_TINT_ANIMATION_DATA.tintStep_RED << 16) + (_TINT_ANIMATION_DATA.tintStep_GREEN << 8) + _TINT_ANIMATION_DATA.tintStep_BLUE;
+            objectToAnimate.tint += paintTint;
+            return _TINT_ANIMATION_DATA.currentStep;
         }
         ;
         static createTileAsGraphics(_CONF, val) {
@@ -214,11 +254,10 @@
         let tempTile = PixiTile.createTileAsGraphics(MAIN_GRAPHICS_CONFIG, i);
         TILE_TEXTURES_LIST[i] = _PIXI_APP.renderer.generateTexture(tempTile);
     }
-    let TOTAL_TILES = 100;
+    let TOTAL_TILES = 500;
     let tilesList = [];
     for (let i = 0; i < TOTAL_TILES; ++i) {
         tilesList.push(new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, i % 9 + 1));
-        tilesList[i].setSpriteMode();
         tilesList[i].moveTo(Math.random() * 500, Math.random() * 500);
         _PIXI_APP.stage.addChild(tilesList[i].getObjectToUse());
     }
@@ -234,12 +273,14 @@
             globalCounter++;
             for (let j = 0; j < TOTAL_TILES; ++j) {
                 tilesList[j].slideOfPrepareFn(Math.random() * 500 - 250, Math.random() * 500 - 250, totalSteps);
+                tilesList[j].prepareAnimateTint(Math.random() * 0xFFFFFF, 12);
                 tilesList[j].faceValue = globalCounter % 10;
             }
             let move = (t) => {
                 if (stepsCounter < totalSteps) {
                     for (let j = 0; j < TOTAL_TILES; ++j) {
                         tilesList[j].slideStep();
+                        tilesList[j].animateTintStep();
                     }
                     stepsCounter++;
                     _PIXI_APP.ticker.update();
@@ -247,7 +288,7 @@
                 }
                 else {
                     for (let j = 0; j < TOTAL_TILES; ++j) {
-                        tilesList[j].resetSlideData();
+                        tilesList[j].resetAllAnimationsData();
                     }
                     _PIXI_APP.ticker.update();
                     moveTilesGroup(totalSteps);

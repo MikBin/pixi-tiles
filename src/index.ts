@@ -80,7 +80,7 @@ for (let i = -9; i < 10; ++i) {
 
 
 /** INCREMENT THIS TO ANIMATE MORE TILES AND STRESS TEST PREFORMANCE */
-let TOTAL_TILES = 100;
+let TOTAL_TILES = 500;
 
 
 let tilesList: PixiTile[] = [];
@@ -90,10 +90,10 @@ for (let i = 0; i < TOTAL_TILES; ++i) {
 
     /** 
      * 
-     *!!!!!! COMMENT THE FOLLOWING LINE TO TEST PERFORMANCE USING GRAPHICS OBJECTS INSTEAD OF SPRITES!!!!!!! 
+     *!!!!!! UNCOMMENT THE FOLLOWING LINE TO TEST PERFORMANCE USING GRAPHICS OBJECTS INSTEAD OF SPRITES!!!!!!! 
      * 
      * */
-    tilesList[i].setSpriteMode();
+    //tilesList[i].setGraphicsMode();
 
 
 
@@ -117,6 +117,7 @@ const moveTilesGroup = (totalSteps: number): Promise<number> => {
         globalCounter++;
         for (let j = 0; j < TOTAL_TILES; ++j) {
             tilesList[j].slideOfPrepareFn(Math.random() * 500 - 250, Math.random() * 500 - 250, totalSteps);
+            tilesList[j].prepareAnimateTint(Math.random() * 0xFFFFFF, 12);
             tilesList[j].faceValue = globalCounter % 10;
         }
 
@@ -124,13 +125,14 @@ const moveTilesGroup = (totalSteps: number): Promise<number> => {
             if (stepsCounter < totalSteps) {
                 for (let j = 0; j < TOTAL_TILES; ++j) {
                     tilesList[j].slideStep();
+                    tilesList[j].animateTintStep();
                 }
                 stepsCounter++;
                 _PIXI_APP.ticker.update();
                 return requestAnimationFrame(move);
             } else {
                 for (let j = 0; j < TOTAL_TILES; ++j) {
-                    tilesList[j].resetSlideData();
+                    tilesList[j].resetAllAnimationsData();
                 }
                 _PIXI_APP.ticker.update();
                 moveTilesGroup(totalSteps);
