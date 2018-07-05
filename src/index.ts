@@ -4,7 +4,7 @@ import * as PIXI from 'pixi.js';
 
 const canvasContainer = document.getElementById("game-play");
 
-const _PIXI_APP: PIXI.Application = new PIXI.Application(1000, 1000, {
+const _PIXI_APP: PIXI.Application = new PIXI.Application(1200, 1200, {
     antialias: true,
     transparent: true,
     autoResize: true
@@ -72,10 +72,101 @@ MAIN_GRAPHICS_CONFIG.roundBorderFactor = Math.ceil(tileFullSize * MAIN_GRAPHICS_
 MAIN_GRAPHICS_CONFIG.doubleBorderFactor = Math.ceil(tileFullSize * MAIN_GRAPHICS_CONFIG.doubleBorderPercent);
 
 const TILE_TEXTURES_LIST: PIXI.Texture[] = [];
+const ANIMATION_TEXTURES_LIST: Object = {
+    "12": {},
+    "11": {},
+    "10": {},
+    "9": {},
+    "8": {},
+    "7": {},
+    "6": {},
+    "5": {},
+    "4": {}
+};
+
+/**
+ * 
+ * BUILD TEXTURES LIST FOR ANIMATIONS
+ * 
+ */
+let auxTilesList: Object = {}
+for (let i = -9; i < 10; ++i) {
+    if (i == 0) { continue; }
+    auxTilesList[i] = new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, ANIMATION_TEXTURES_LIST, i);
+    auxTilesList[i].setGraphicsMode();
+    let tmpTile = auxTilesList[i];
+
+    //12
+    ANIMATION_TEXTURES_LIST["12"][i] = [];
+    tmpTile._prepareAnimateBorderTextGraphics(12);
+    for (let j = 0; j < 12; ++j) {
+        tmpTile._animateBorderTextStep();
+        let tmpTexture = _PIXI_APP.renderer.generateTexture(tmpTile.getGraphics() as PIXI.Graphics);
+        ANIMATION_TEXTURES_LIST["12"][i].push(tmpTexture);
+        /*  let tmpSprite = new PIXI.Sprite(tmpTexture);
+          tmpSprite.x = 100 * (i + 9);
+          tmpSprite.y = 100 * j;
+         
+          _PIXI_APP.stage.addChild(tmpSprite);*/
+    }
+
+    //11
+    ANIMATION_TEXTURES_LIST["11"][i] = [];
+    for (let j = 0; j < 11; ++j) {
+        ANIMATION_TEXTURES_LIST["11"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j + 1]);
+    }
+
+    //10
+    ANIMATION_TEXTURES_LIST["10"][i] = [];
+    for (let j = 0; j < 10; ++j) {
+        let t = j < 9 ? j + 1 : j + 2;
+        ANIMATION_TEXTURES_LIST["10"][i].push(ANIMATION_TEXTURES_LIST["12"][i][t]);
+    }
+    //9
+    ANIMATION_TEXTURES_LIST["9"][i] = [];
+    for (let j = 0; j < 9; ++j) {
+        ANIMATION_TEXTURES_LIST["9"][i].push(ANIMATION_TEXTURES_LIST["10"][i][j + 1]);
+    }
+
+    //8
+    ANIMATION_TEXTURES_LIST["8"][i] = [];
+    for (let j = 0; j < 8; ++j) {
+        ANIMATION_TEXTURES_LIST["8"][i].push(ANIMATION_TEXTURES_LIST["9"][i][j + 1]);
+
+    }
+    //7
+    ANIMATION_TEXTURES_LIST["7"][i] = [];
+    for (let j = 0; j < 12; j++) {
+        if (j > 1) { j++; }
+        ANIMATION_TEXTURES_LIST["7"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+    }
+    //6
+    ANIMATION_TEXTURES_LIST["6"][i] = [];
+    for (let j = 0; j < 12; j += 2) {
+        ANIMATION_TEXTURES_LIST["6"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+    }
+    //5
+    ANIMATION_TEXTURES_LIST["5"][i] = [];
+    for (let j = 0; j < 10; j += 2) {
+        ANIMATION_TEXTURES_LIST["5"][i].push(ANIMATION_TEXTURES_LIST["10"][i][j]);
+
+    }
+
+    //4
+    ANIMATION_TEXTURES_LIST["4"][i] = [];
+    for (let j = 0; j < 12; j += 3) {
+        ANIMATION_TEXTURES_LIST["4"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+    }
+}
 
 for (let i = -9; i < 10; ++i) {
     let tempTile: PIXI.Graphics = PixiTile.createTileAsGraphics(MAIN_GRAPHICS_CONFIG, i);
     TILE_TEXTURES_LIST[i] = _PIXI_APP.renderer.generateTexture(tempTile);
+    /**create tile textures for animations steps:
+     * 12 steps works for 6-4-3 steps (works for 11)
+     * 10 steps works for (5 as well as for 9)
+     * 8 steps (works for 7 too)     
+     */
 }
 
 
@@ -86,7 +177,7 @@ let TOTAL_TILES = 500;
 let tilesList: PixiTile[] = [];
 
 for (let i = 0; i < TOTAL_TILES; ++i) {
-    tilesList.push(new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, i % 9 + 1));
+    tilesList.push(new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, ANIMATION_TEXTURES_LIST, i % 9 + 1));
 
     /** 
      * 
@@ -95,12 +186,12 @@ for (let i = 0; i < TOTAL_TILES; ++i) {
      * */
     //tilesList[i].setGraphicsMode();
 
-
-
     tilesList[i].moveTo(Math.random() * 500, Math.random() * 500);
-    _PIXI_APP.stage.addChild(tilesList[i].getObjectToUse());
+    _PIXI_APP.stage.addChild(tilesList[i].getObjectToUse() as PIXI.Graphics);
 
 }
+
+
 
 
 _PIXI_APP.ticker.stop();
@@ -118,14 +209,18 @@ const moveTilesGroup = (totalSteps: number): Promise<number> => {
         for (let j = 0; j < TOTAL_TILES; ++j) {
             tilesList[j].slideOfPrepareFn(Math.random() * 500 - 250, Math.random() * 500 - 250, totalSteps);
             tilesList[j].prepareAnimateTint(Math.random() * 0xFFFFFF, 12);
-            tilesList[j].faceValue = globalCounter % 10;
+            tilesList[j].preapreAnimateDouble(12, j % 2 == 0 ? 1 : -1);
+            //tilesList[j].faceValue = globalCounter % 10;
         }
 
         let move = (t: number) => {
             if (stepsCounter < totalSteps) {
                 for (let j = 0; j < TOTAL_TILES; ++j) {
+                    /**texting texture switch at every tick, commend the following line to stop it */
+                    // tilesList[j].faceValue = ~~(Math.random() * 10);
                     tilesList[j].slideStep();
                     tilesList[j].animateTintStep();
+                    tilesList[j].stepAnimateDouble();
                 }
                 stepsCounter++;
                 _PIXI_APP.ticker.update();

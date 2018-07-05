@@ -1,5 +1,11 @@
-(function (pixiFilters,PIXI$1) {
+(function (PIXI$1) {
     'use strict';
+
+    var directionFB;
+    (function (directionFB) {
+        directionFB[directionFB["forward"] = 1] = "forward";
+        directionFB[directionFB["backward"] = -1] = "backward";
+    })(directionFB || (directionFB = {}));
 
     var mainGraphicType;
     (function (mainGraphicType) {
@@ -7,17 +13,19 @@
         mainGraphicType[mainGraphicType["Sprite"] = 1] = "Sprite";
     })(mainGraphicType || (mainGraphicType = {}));
     class PixiTile {
-        constructor(globalConfig, APP, _TEXTURES_LIST, _value = 0) {
+        constructor(globalConfig, APP, _TEXTURES_LIST, _ANIMATION_TEXTURES, _value = 0) {
             this.globalConfig = globalConfig;
             this.APP = APP;
             this._TEXTURES_LIST = _TEXTURES_LIST;
+            this._ANIMATION_TEXTURES = _ANIMATION_TEXTURES;
             this._value = _value;
             this.graphicsType = mainGraphicType.Sprite;
             this._GRAPHICS_OBJECT = PixiTile.createTileAsGraphics(globalConfig, _value);
             this._SPRITE_OBJECT = new PIXI.Sprite(_TEXTURES_LIST[_value]);
             this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._SPRITE_OBJECT };
             this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep_RED: 0, tintStep_BLUE: 0, tintStep_GREEN: 0, objectToAnimate: this._SPRITE_OBJECT };
-            this.doubleValueFilter = new pixiFilters.GlowFilter();
+            this._GRAPHICS_ANIMATE_DATA = { currentStep: 0, totalSteps: 0, textSizeStep: 0, strokeThicknessStep: 0, borderRadiusStep: 0, currentRadius: globalConfig.roundBorderFactor };
+            this._TEXTURE_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, texturesList: [], direction: directionFB.forward, _index: 0 };
         }
         setSpriteMode() {
             this.graphicsType = mainGraphicType.Sprite;
@@ -88,6 +96,10 @@
             this._TINT_ANIMATION_DATA.tintStep_BLUE = 0;
             this._TINT_ANIMATION_DATA.tintStep_GREEN = 0;
             this._TINT_ANIMATION_DATA.tintStep_RED = 0;
+            this._TEXTURE_ANIMATION_DATA.totalSteps = 0;
+            this._TEXTURE_ANIMATION_DATA.direction = directionFB.forward;
+            this._TEXTURE_ANIMATION_DATA._index = 0;
+            this._TEXTURE_ANIMATION_DATA.currentStep = 0;
             return this;
         }
         ;
@@ -101,6 +113,8 @@
                 if (v !== 0) {
                     numberElement.text = `${v}`;
                     numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[v] : this.globalConfig.negativeNumberColor;
+                    numberElement.style.fontSize = this.globalConfig.fontSize;
+                    numberElement.style.strokeThickness = this.globalConfig.strokeThicknessBase;
                 }
                 else {
                     numberElement.text = '';
@@ -136,6 +150,25 @@
         ;
         setSpriteFaceValue() { }
         ;
+        preapreAnimateDouble(steps, dir) {
+            this._TEXTURE_ANIMATION_DATA.totalSteps = steps;
+            this._TEXTURE_ANIMATION_DATA.direction = dir;
+            this._TEXTURE_ANIMATION_DATA._index = dir === directionFB.forward ? 0 : steps - 1;
+            this._TEXTURE_ANIMATION_DATA.currentStep = 0;
+            this._TEXTURE_ANIMATION_DATA.texturesList = this._ANIMATION_TEXTURES[steps][this._value];
+        }
+        ;
+        stepAnimateDouble() {
+            let _TEXTURE_ANIMATION_DATA = this._TEXTURE_ANIMATION_DATA;
+            if (_TEXTURE_ANIMATION_DATA.currentStep == _TEXTURE_ANIMATION_DATA.totalSteps) {
+                return _TEXTURE_ANIMATION_DATA.totalSteps;
+            }
+            this._SPRITE_OBJECT.texture = _TEXTURE_ANIMATION_DATA.texturesList[_TEXTURE_ANIMATION_DATA._index];
+            _TEXTURE_ANIMATION_DATA._index += _TEXTURE_ANIMATION_DATA.direction;
+            _TEXTURE_ANIMATION_DATA.currentStep++;
+            return _TEXTURE_ANIMATION_DATA.currentStep;
+        }
+        ;
         prepareAnimateTint(tint, steps) {
             let graphicsData = this._TINT_ANIMATION_DATA.objectToAnimate = this.graphicsType === mainGraphicType.Graphics ? this._GRAPHICS_OBJECT : this._SPRITE_OBJECT;
             this._TINT_ANIMATION_DATA.currentStep = 0;
@@ -162,6 +195,54 @@
             let paintTint = (_TINT_ANIMATION_DATA.tintStep_RED << 16) + (_TINT_ANIMATION_DATA.tintStep_GREEN << 8) + _TINT_ANIMATION_DATA.tintStep_BLUE;
             objectToAnimate.tint += paintTint;
             return _TINT_ANIMATION_DATA.currentStep;
+        }
+        ;
+        _resetBorderAndTextGraphics() {
+            let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT;
+            this.faceValue = this._value;
+            _GRAPHICS_OBJECT.clear();
+            _GRAPHICS_OBJECT.beginFill(this.globalConfig.tileBackColor, this.globalConfig.defaultAlpha);
+            _GRAPHICS_OBJECT.drawRoundedRect(0, 0, this.globalConfig.tileSize, this.globalConfig.tileSize, this.globalConfig.roundBorderFactor);
+            _GRAPHICS_OBJECT.endFill();
+        }
+        ;
+        _prepareAnimateBorderTextGraphics(steps) {
+            let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT;
+            let text = _GRAPHICS_OBJECT.children[0];
+            let textStyle = text.style;
+            let fontSize = textStyle.fontSize;
+            let _GRAPHICS_ANIMATE_DATA = this._GRAPHICS_ANIMATE_DATA;
+            _GRAPHICS_ANIMATE_DATA.currentStep = 0;
+            _GRAPHICS_ANIMATE_DATA.totalSteps = steps;
+            _GRAPHICS_ANIMATE_DATA.borderRadiusStep = (this.globalConfig.doubleBorderFactor - this.globalConfig.roundBorderFactor) / steps;
+            _GRAPHICS_ANIMATE_DATA.strokeThicknessStep = (this.globalConfig.strokeThicknessDouble - textStyle.strokeThickness) / steps;
+            _GRAPHICS_ANIMATE_DATA.textSizeStep = (this.globalConfig.biggerFontSize - fontSize) / steps;
+        }
+        ;
+        _animateBorderTextStep() {
+            let _GRAPHICS_ANIMATE_DATA = this._GRAPHICS_ANIMATE_DATA;
+            if (_GRAPHICS_ANIMATE_DATA.currentStep === _GRAPHICS_ANIMATE_DATA.totalSteps) {
+                return 0;
+            }
+            let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT;
+            let text = _GRAPHICS_OBJECT.children[0];
+            let textStyle = text.style;
+            let fontSize = textStyle.fontSize;
+            let rad = this._GRAPHICS_OBJECT.radius;
+            let h = this.globalConfig.tileSize;
+            let w = this.globalConfig.tileSize;
+            let alpha = this.globalConfig.defaultAlpha;
+            let color = this.globalConfig.tileBackColor;
+            _GRAPHICS_ANIMATE_DATA.currentStep++;
+            fontSize += _GRAPHICS_ANIMATE_DATA.textSizeStep;
+            textStyle.fontSize = fontSize;
+            textStyle.strokeThickness += _GRAPHICS_ANIMATE_DATA.strokeThicknessStep;
+            _GRAPHICS_ANIMATE_DATA.currentRadius += _GRAPHICS_ANIMATE_DATA.borderRadiusStep;
+            _GRAPHICS_OBJECT.clear();
+            _GRAPHICS_OBJECT.beginFill(color, alpha);
+            _GRAPHICS_OBJECT.drawRoundedRect(0, 0, h, w, _GRAPHICS_ANIMATE_DATA.currentRadius);
+            _GRAPHICS_OBJECT.endFill();
+            return _GRAPHICS_ANIMATE_DATA.currentStep;
         }
         ;
         static createTileAsGraphics(_CONF, val) {
@@ -192,7 +273,7 @@
     }
 
     const canvasContainer = document.getElementById("game-play");
-    const _PIXI_APP = new PIXI$1.Application(1000, 1000, {
+    const _PIXI_APP = new PIXI$1.Application(1200, 1200, {
         antialias: true,
         transparent: true,
         autoResize: true
@@ -250,6 +331,69 @@
     MAIN_GRAPHICS_CONFIG.roundBorderFactor = Math.ceil(tileFullSize * MAIN_GRAPHICS_CONFIG.borderPercent);
     MAIN_GRAPHICS_CONFIG.doubleBorderFactor = Math.ceil(tileFullSize * MAIN_GRAPHICS_CONFIG.doubleBorderPercent);
     const TILE_TEXTURES_LIST = [];
+    const ANIMATION_TEXTURES_LIST = {
+        "12": {},
+        "11": {},
+        "10": {},
+        "9": {},
+        "8": {},
+        "7": {},
+        "6": {},
+        "5": {},
+        "4": {}
+    };
+    let auxTilesList = {};
+    for (let i = -9; i < 10; ++i) {
+        if (i == 0) {
+            continue;
+        }
+        auxTilesList[i] = new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, ANIMATION_TEXTURES_LIST, i);
+        auxTilesList[i].setGraphicsMode();
+        let tmpTile = auxTilesList[i];
+        ANIMATION_TEXTURES_LIST["12"][i] = [];
+        tmpTile._prepareAnimateBorderTextGraphics(12);
+        for (let j = 0; j < 12; ++j) {
+            tmpTile._animateBorderTextStep();
+            let tmpTexture = _PIXI_APP.renderer.generateTexture(tmpTile.getGraphics());
+            ANIMATION_TEXTURES_LIST["12"][i].push(tmpTexture);
+        }
+        ANIMATION_TEXTURES_LIST["11"][i] = [];
+        for (let j = 0; j < 11; ++j) {
+            ANIMATION_TEXTURES_LIST["11"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j + 1]);
+        }
+        ANIMATION_TEXTURES_LIST["10"][i] = [];
+        for (let j = 0; j < 10; ++j) {
+            let t = j < 9 ? j + 1 : j + 2;
+            ANIMATION_TEXTURES_LIST["10"][i].push(ANIMATION_TEXTURES_LIST["12"][i][t]);
+        }
+        ANIMATION_TEXTURES_LIST["9"][i] = [];
+        for (let j = 0; j < 9; ++j) {
+            ANIMATION_TEXTURES_LIST["9"][i].push(ANIMATION_TEXTURES_LIST["10"][i][j + 1]);
+        }
+        ANIMATION_TEXTURES_LIST["8"][i] = [];
+        for (let j = 0; j < 8; ++j) {
+            ANIMATION_TEXTURES_LIST["8"][i].push(ANIMATION_TEXTURES_LIST["9"][i][j + 1]);
+        }
+        ANIMATION_TEXTURES_LIST["7"][i] = [];
+        for (let j = 0; j < 12; j++) {
+            if (j > 1) {
+                j++;
+            }
+            ANIMATION_TEXTURES_LIST["7"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+        }
+        ANIMATION_TEXTURES_LIST["6"][i] = [];
+        for (let j = 0; j < 12; j += 2) {
+            ANIMATION_TEXTURES_LIST["6"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+        }
+        ANIMATION_TEXTURES_LIST["5"][i] = [];
+        for (let j = 0; j < 10; j += 2) {
+            ANIMATION_TEXTURES_LIST["5"][i].push(ANIMATION_TEXTURES_LIST["10"][i][j]);
+        }
+        ANIMATION_TEXTURES_LIST["4"][i] = [];
+        for (let j = 0; j < 12; j += 3) {
+            ANIMATION_TEXTURES_LIST["4"][i].push(ANIMATION_TEXTURES_LIST["12"][i][j]);
+        }
+    }
     for (let i = -9; i < 10; ++i) {
         let tempTile = PixiTile.createTileAsGraphics(MAIN_GRAPHICS_CONFIG, i);
         TILE_TEXTURES_LIST[i] = _PIXI_APP.renderer.generateTexture(tempTile);
@@ -257,7 +401,7 @@
     let TOTAL_TILES = 500;
     let tilesList = [];
     for (let i = 0; i < TOTAL_TILES; ++i) {
-        tilesList.push(new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, i % 9 + 1));
+        tilesList.push(new PixiTile(MAIN_GRAPHICS_CONFIG, _PIXI_APP, TILE_TEXTURES_LIST, ANIMATION_TEXTURES_LIST, i % 9 + 1));
         tilesList[i].moveTo(Math.random() * 500, Math.random() * 500);
         _PIXI_APP.stage.addChild(tilesList[i].getObjectToUse());
     }
@@ -274,13 +418,14 @@
             for (let j = 0; j < TOTAL_TILES; ++j) {
                 tilesList[j].slideOfPrepareFn(Math.random() * 500 - 250, Math.random() * 500 - 250, totalSteps);
                 tilesList[j].prepareAnimateTint(Math.random() * 0xFFFFFF, 12);
-                tilesList[j].faceValue = globalCounter % 10;
+                tilesList[j].preapreAnimateDouble(12, j % 2 == 0 ? 1 : -1);
             }
             let move = (t) => {
                 if (stepsCounter < totalSteps) {
                     for (let j = 0; j < TOTAL_TILES; ++j) {
                         tilesList[j].slideStep();
                         tilesList[j].animateTintStep();
+                        tilesList[j].stepAnimateDouble();
                     }
                     stepsCounter++;
                     _PIXI_APP.ticker.update();
@@ -300,5 +445,5 @@
     };
     moveTilesGroup(12);
 
-}(PIXI.filters,PIXI));
+}(PIXI));
 //# sourceMappingURL=main.es6.js.map

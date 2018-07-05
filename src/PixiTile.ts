@@ -1,7 +1,7 @@
-import { slideData } from "./interfaces";
+import { slideData, doubleGraphicsAnimation, textureBasedAnimationData, directionFB } from "./interfaces";
 import { tintAnimationData } from "./interfaces";
 import { graphicsConfiguration } from "./interfaces";
-import { Graphics } from "pixi.js";
+import { Graphics, GraphicsData } from "pixi.js";
 import { GlowFilter } from "pixi-filters";
 
 // @ts-ignore
@@ -11,23 +11,27 @@ enum mainGraphicType { Graphics, Sprite };
 const startGlowFilterValues: number[] = [0, 0, 0, 0xFFFFFF, 0.1];
 
 class PixiTile {
-    private _GRAPHICS_OBJECT: PIXI.Graphics;
+    private _GRAPHICS_OBJECT: PIXI.RoundedRectangle | PIXI.Graphics;
     private _SPRITE_OBJECT: PIXI.Sprite;
     private _SLIDE_DATA: slideData;
+    private _GRAPHICS_ANIMATE_DATA: doubleGraphicsAnimation;
     private _TINT_ANIMATION_DATA: tintAnimationData;
+    private _TEXTURE_ANIMATION_DATA: textureBasedAnimationData;
     private graphicsType: mainGraphicType;
     private doubleValueFilter: GlowFilter;
     /**integer coordinates relative to rowsXcols grid size  --> independent of canvas size */
     private absX: number;
     private absY: number;
-    constructor(private globalConfig: any, private APP: PIXI.Application, private _TEXTURES_LIST: PIXI.Texture[], private _value: number | string = 0) {
+    constructor(private globalConfig: graphicsConfiguration, private APP: PIXI.Application, private _TEXTURES_LIST: PIXI.Texture[], private _ANIMATION_TEXTURES: Object, private _value: number | string = 0) {
 
         this.graphicsType = mainGraphicType.Sprite;
         this._GRAPHICS_OBJECT = PixiTile.createTileAsGraphics(globalConfig, _value);
         this._SPRITE_OBJECT = new PIXI.Sprite(_TEXTURES_LIST[_value as number]);
         this._SLIDE_DATA = { currentStep: 0, slideAmountX: 0, slideAmountY: 0, totalSteps: 0, objectToMove: this._SPRITE_OBJECT };
         this._TINT_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, tintStep_RED: 0, tintStep_BLUE: 0, tintStep_GREEN: 0, objectToAnimate: this._SPRITE_OBJECT };
-        this.doubleValueFilter = new GlowFilter();
+        this._GRAPHICS_ANIMATE_DATA = { currentStep: 0, totalSteps: 0, textSizeStep: 0, strokeThicknessStep: 0, borderRadiusStep: 0, currentRadius: globalConfig.roundBorderFactor };
+        this._TEXTURE_ANIMATION_DATA = { currentStep: 0, totalSteps: 0, texturesList: [], direction: directionFB.forward, _index: 0 };
+        //this.doubleValueFilter = new GlowFilter();
         // this._SPRITE_OBJECT.filters = [this.doubleValueFilter];
 
     }
@@ -93,7 +97,12 @@ class PixiTile {
         this._TINT_ANIMATION_DATA.tintStep_BLUE = 0;
         this._TINT_ANIMATION_DATA.tintStep_GREEN = 0;
         this._TINT_ANIMATION_DATA.tintStep_RED = 0;
+        this._TEXTURE_ANIMATION_DATA.totalSteps = 0;
+        this._TEXTURE_ANIMATION_DATA.direction = directionFB.forward;
+        this._TEXTURE_ANIMATION_DATA._index = 0;
+        this._TEXTURE_ANIMATION_DATA.currentStep = 0;
 
+        //TODO reset texture ones
         return this;
     };
     set faceValue(v: number | string) {
@@ -103,11 +112,13 @@ class PixiTile {
             this._SPRITE_OBJECT.texture = this._TEXTURES_LIST[this._value as number];
         } else {
 
-            let numberElement = this._GRAPHICS_OBJECT.children[0] as PIXI.Text;
+            let numberElement = (<PIXI.Graphics>this._GRAPHICS_OBJECT).children[0] as PIXI.Text;
 
             if (v !== 0) {
                 numberElement.text = `${v}`;
                 numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[v] : this.globalConfig.negativeNumberColor;
+                numberElement.style.fontSize = this.globalConfig.fontSize;
+                numberElement.style.strokeThickness = this.globalConfig.strokeThicknessBase;
             } else {
                 numberElement.text = '';
             }
@@ -123,23 +134,44 @@ class PixiTile {
     set Y(y: number) {
         this.absY = y;
     };
-    getGraphics(): PIXI.Graphics {
+    getGraphics(): PIXI.Sprite | PIXI.Graphics | PIXI.RoundedRectangle {
         return this._GRAPHICS_OBJECT;
     };
     getSprite(): PIXI.Sprite {
         return this._SPRITE_OBJECT;
     };
-    getObjectToUse(): PIXI.Sprite | PIXI.Graphics {
+    getObjectToUse(): PIXI.Sprite | PIXI.Graphics | PIXI.RoundedRectangle {
         return this.graphicsType === mainGraphicType.Graphics ? this._GRAPHICS_OBJECT : this._SPRITE_OBJECT;
     };
     setGraphicsFaceValue() { };
     setSpriteFaceValue() { };
+    preapreAnimateDouble(steps: number, dir: directionFB): void {
+        this._TEXTURE_ANIMATION_DATA.totalSteps = steps;
+        this._TEXTURE_ANIMATION_DATA.direction = dir;
+        this._TEXTURE_ANIMATION_DATA._index = dir === directionFB.forward ? 0 : steps - 1;
+        this._TEXTURE_ANIMATION_DATA.currentStep = 0;
+        this._TEXTURE_ANIMATION_DATA.texturesList = this._ANIMATION_TEXTURES[steps][this._value];
+
+    };
+    stepAnimateDouble(): number {
+
+        let _TEXTURE_ANIMATION_DATA = this._TEXTURE_ANIMATION_DATA;
+        if (_TEXTURE_ANIMATION_DATA.currentStep == _TEXTURE_ANIMATION_DATA.totalSteps) {
+            return _TEXTURE_ANIMATION_DATA.totalSteps;
+        }
+
+        this._SPRITE_OBJECT.texture = _TEXTURE_ANIMATION_DATA.texturesList[_TEXTURE_ANIMATION_DATA._index];
+
+        _TEXTURE_ANIMATION_DATA._index += _TEXTURE_ANIMATION_DATA.direction;
+        _TEXTURE_ANIMATION_DATA.currentStep++;
+        return _TEXTURE_ANIMATION_DATA.currentStep;
+    };
     prepareAnimateTint(tint: number, steps: number): void {
 
         let graphicsData = this._TINT_ANIMATION_DATA.objectToAnimate = this.graphicsType === mainGraphicType.Graphics ? this._GRAPHICS_OBJECT : this._SPRITE_OBJECT;
         this._TINT_ANIMATION_DATA.currentStep = 0;
         this._TINT_ANIMATION_DATA.totalSteps = steps;
-        let fillColor: number = graphicsData.tint;
+        let fillColor: number = (<PIXI.Graphics>graphicsData).tint;
         let r = (fillColor & 0xFF0000) >> 16;
         let g = (fillColor & 0x00FF00) >> 8;
         let b = fillColor & 0x0000FF;
@@ -165,13 +197,62 @@ class PixiTile {
         let paintTint: number =
             (_TINT_ANIMATION_DATA.tintStep_RED << 16) + (_TINT_ANIMATION_DATA.tintStep_GREEN << 8) + _TINT_ANIMATION_DATA.tintStep_BLUE;
 
-        objectToAnimate.tint += paintTint;
+        (<PIXI.Graphics>objectToAnimate).tint += paintTint;
 
         return _TINT_ANIMATION_DATA.currentStep;
     };
+    _resetBorderAndTextGraphics() {
+        /**graphics mode only */
+        let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT as PIXI.Graphics;
+        this.faceValue = this._value;
+        _GRAPHICS_OBJECT.clear();
+        _GRAPHICS_OBJECT.beginFill(this.globalConfig.tileBackColor, this.globalConfig.defaultAlpha);
+        _GRAPHICS_OBJECT.drawRoundedRect(0, 0, this.globalConfig.tileSize, this.globalConfig.tileSize, this.globalConfig.roundBorderFactor);
+        _GRAPHICS_OBJECT.endFill();
+    };
+    _prepareAnimateBorderTextGraphics(steps: number): void {
+        /**used for prerendering textures only */
+        let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT;
+        let text: PIXI.Text = (<PIXI.Graphics>_GRAPHICS_OBJECT).children[0] as PIXI.Text;
+        let textStyle: PIXI.TextStyle = text.style;
+        let fontSize: number | string = textStyle.fontSize as number;
+        let _GRAPHICS_ANIMATE_DATA = this._GRAPHICS_ANIMATE_DATA;
+        _GRAPHICS_ANIMATE_DATA.currentStep = 0;
+        _GRAPHICS_ANIMATE_DATA.totalSteps = steps;
+        _GRAPHICS_ANIMATE_DATA.borderRadiusStep = (this.globalConfig.doubleBorderFactor - this.globalConfig.roundBorderFactor) / steps;
+        _GRAPHICS_ANIMATE_DATA.strokeThicknessStep = (this.globalConfig.strokeThicknessDouble - textStyle.strokeThickness) / steps;
+        _GRAPHICS_ANIMATE_DATA.textSizeStep = (this.globalConfig.biggerFontSize - fontSize) / steps;
+    };
+    _animateBorderTextStep(): number {
+        /**used for prerendering textures only */
+        let _GRAPHICS_ANIMATE_DATA = this._GRAPHICS_ANIMATE_DATA;
+        if (_GRAPHICS_ANIMATE_DATA.currentStep === _GRAPHICS_ANIMATE_DATA.totalSteps) {
+            return 0;
+        }
+        let _GRAPHICS_OBJECT = this._GRAPHICS_OBJECT as PIXI.Graphics;
+        let text: PIXI.Text = (<PIXI.Graphics>_GRAPHICS_OBJECT).children[0] as PIXI.Text;
+        let textStyle: PIXI.TextStyle = text.style;
+        let fontSize: number | string = textStyle.fontSize as number;
+        let rad = (<PIXI.RoundedRectangle>this._GRAPHICS_OBJECT).radius;
+        let h: number = this.globalConfig.tileSize;
+        let w: number = this.globalConfig.tileSize;
+        let alpha: number = this.globalConfig.defaultAlpha;
+        let color: number = this.globalConfig.tileBackColor;
+        _GRAPHICS_ANIMATE_DATA.currentStep++;
+        fontSize += _GRAPHICS_ANIMATE_DATA.textSizeStep;
+        textStyle.fontSize = fontSize;
+        textStyle.strokeThickness += _GRAPHICS_ANIMATE_DATA.strokeThicknessStep;
+        _GRAPHICS_ANIMATE_DATA.currentRadius += _GRAPHICS_ANIMATE_DATA.borderRadiusStep;
+        _GRAPHICS_OBJECT.clear();
+        _GRAPHICS_OBJECT.beginFill(color, alpha);
+        _GRAPHICS_OBJECT.drawRoundedRect(0, 0, h, w, _GRAPHICS_ANIMATE_DATA.currentRadius);
+        _GRAPHICS_OBJECT.endFill();
+        return _GRAPHICS_ANIMATE_DATA.currentStep;
+    };
+
     static createTileAsGraphics(_CONF: graphicsConfiguration, val: number | string | null) {
 
-        let aTile: PIXI.Graphics = new PIXI.Graphics();
+        let aTile: PIXI.RoundedRectangle | PIXI.Graphics = new PIXI.Graphics();
 
         aTile.beginFill(_CONF.tileBackColor, _CONF.defaultAlpha);
 
