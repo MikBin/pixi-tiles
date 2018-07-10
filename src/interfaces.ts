@@ -1,3 +1,4 @@
+import { PixiTile } from "./PixiTile";
 
 export enum directionFB { forward = 1, backward = -1 };
 
@@ -20,6 +21,7 @@ export interface tintAnimationData extends animationData {
     tintStep_RED: number;
     tintStep_GREEN: number;
     tintStep_BLUE: number;
+    endTint: number;
     objectToAnimate: PIXI.Sprite | PIXI.Graphics | PIXI.RoundedRectangle;
 };
 export interface doubleGraphicsAnimation extends animationData {
@@ -28,6 +30,21 @@ export interface doubleGraphicsAnimation extends animationData {
     textSizeStep: number;
     strokeThicknessStep: number;
 }
+
+export interface canvasSizes {
+    width: number;
+    height: number;
+};
+
+
+export interface moveAndAnimateData {
+    stepsBase: number;
+    latestTimeDeltaRecord: number;
+    slidesEMAalpha: number;
+    stepsCounter: number;
+    animationTiming: number;
+    slideChangeThreshold: number;
+};
 export interface graphicsConfiguration {
     marginPercent: number;
     fontSizePercent: number;
@@ -37,10 +54,11 @@ export interface graphicsConfiguration {
     _16_9_MOD: number;
     containerHeightModifier: number;
     sizeNormalizer: number;
-    rows: number;
-    cols: number;
-    tileSize: number;
-    tileFullSize: number;
+    rows?: number;
+    cols?: number;
+    tileSize?: number;
+    tileFullSize?: number;
+    sourceTileTextureSize: number;
     fontSize: number;
     biggerFontSize: number;
     tileBackColor: number;
@@ -57,7 +75,8 @@ export interface graphicsConfiguration {
     stepsFor_60_FPS: number;
     stepsLimit: number;
     margins: number;
-    animationTiming: number;
-    slideChangeThreshold: number;
-
+    animationTiming?: number;
+    slideChangeThreshold?: number;
 }
+
+export enum WEIGHTS { zero = 0, one = 1, double = 2 };

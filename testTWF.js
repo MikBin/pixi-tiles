@@ -1028,90 +1028,15 @@
     console.timeEnd("textures");
 
     const canvasContainer = document.getElementById("game-play");
-    const _PIXI_APP = new PIXI$1.Application(1200, 1200, {
-        antialias: true,
-        transparent: true,
-        autoResize: true
-    });
-    _PIXI_APP.renderer.autoResize = true;
-    canvasContainer.appendChild(_PIXI_APP.view);
-    const torusContainer = new PIXI$1.Container();
-    _PIXI_APP.stage.addChild(torusContainer);
-    torusContainer.x = 0;
-    torusContainer.y = 0;
-    torusContainer.interactiveChildren = false;
-    _PIXI_APP.stage.interactive = true;
-    const tileFullSize = 100;
-    const _main_graphics_config = Object.assign({}, MAIN_GRAPHICS_CONFIG);
-    TorusViewFactory.setMainGraphicsConfig(tileFullSize, _main_graphics_config);
-    const TILE_TEXTURES_LIST = [];
-    for (let i = -9; i < 10; ++i) {
-        let tempTile = PixiTile.createTileAsGraphics(_main_graphics_config, i);
-        TILE_TEXTURES_LIST[i] = _PIXI_APP.renderer.generateTexture(tempTile);
-    }
-    let ANIMATION_TEXTURES_LIST = {
-        "12": {},
-        "11": {},
-        "10": {},
-        "9": {},
-        "8": {},
-        "7": {},
-        "6": {},
-        "5": {},
-        "4": {}
-    };
-    let neueConfig = Object.assign({}, MAIN_GRAPHICS_CONFIG);
-    TorusViewFactory.setMainGraphicsConfig(262, neueConfig);
-    ANIMATION_TEXTURES_LIST = TorusViewFactory.buildAnimationTexturesList(_PIXI_APP, neueConfig);
-    console.log(ANIMATION_TEXTURES_LIST);
-    let TOTAL_TILES = 100;
-    let tilesList = [];
-    for (let i = 0; i < TOTAL_TILES; ++i) {
-        tilesList.push(new PixiTile(_main_graphics_config, _PIXI_APP, TILE_TEXTURES_LIST, ANIMATION_TEXTURES_LIST, i % 9 + 1));
-        tilesList[i].moveTo(Math.random() * 500, Math.random() * 500);
-        _PIXI_APP.stage.addChild(tilesList[i].getObjectToUse());
-    }
-    console.log("loggin tiles list: ", tilesList);
-    window.ticker = _PIXI_APP.ticker;
-    _PIXI_APP.ticker.stop();
-    _PIXI_APP.ticker.update();
-    let globalCounter = 0;
-    const moveTilesGroup = (totalSteps) => {
-        return new Promise(function (resolve, reject) {
-            let stepsCounter = 0;
-            if (globalCounter >= 100) {
-                return reject(globalCounter);
-            }
-            globalCounter++;
-            for (let j = 0; j < TOTAL_TILES; ++j) {
-                tilesList[j].slideOfPrepareFn(Math.random() * 500 - 250, Math.random() * 500 - 250, totalSteps);
-                tilesList[j].prepareAnimateTint(Math.random() * 0xFFFFFF, 12);
-                tilesList[j].preapreAnimateDouble(12, j % 2 == 0 ? 1 : -1);
-            }
-            let move = (t) => {
-                if (stepsCounter < totalSteps) {
-                    for (let j = 0; j < TOTAL_TILES; ++j) {
-                        tilesList[j].slideStep();
-                        tilesList[j].animateTintStep();
-                        tilesList[j].stepAnimateDouble();
-                    }
-                    stepsCounter++;
-                    _PIXI_APP.ticker.update();
-                    return requestAnimationFrame(move);
-                }
-                else {
-                    for (let j = 0; j < TOTAL_TILES; ++j) {
-                        tilesList[j].resetAllAnimationsData();
-                    }
-                    _PIXI_APP.ticker.update();
-                    moveTilesGroup(totalSteps);
-                    return resolve(totalSteps);
-                }
-            };
-            requestAnimationFrame(move);
-        });
-    };
-    moveTilesGroup(12);
+    const torusModel = gridModel.GridFactory("44440n406066n60n0606550n550n5nnnn10n11n12n2n2n2n0r7c7");
+    torusModel.setHistoryOn();
+    torusModel.valuate();
+    let TWF = new TorusViewFactory(torusModel, canvasContainer);
+    setTimeout(() => {
+        let animations = TWF.syncTilesWeights();
+        console.log(animations);
+        TWF.runAnimationVector(animations, "callWeightChangeAnimationStep", 12).then(res => console.log(res));
+    }, 1000);
 
 }(PIXI));
-//# sourceMappingURL=main.es6.js.map
+//# sourceMappingURL=testTWF.js.map
