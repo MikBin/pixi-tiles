@@ -1,8 +1,8 @@
 import { PixiTile } from "./PixiTile";
 import { graphicsConfiguration } from "./interfaces";
 import * as PIXI from 'pixi.js';
-import { MAIN_GRAPHICS_CONFIG } from "./torusViewFactory";
-import { TorusViewFactory } from "./torusViewFactory";
+import { MAIN_GRAPHICS_CONFIG } from "./TorusViewBundle";
+import { TorusViewFactory } from "./TorusViewBundle";
 
 const canvasContainer = document.getElementById("game-play");
 

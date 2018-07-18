@@ -1,4 +1,4 @@
-import { TorusViewFactory } from "./torusViewFactory";
+import { TorusViewFactory } from "./TorusViewBundle";
 declare var gridModel: any;
 const canvasContainer = document.getElementById("game-play");
 
@@ -8,8 +8,12 @@ torusModel.valuate();
 
 let TWF = new TorusViewFactory(torusModel, canvasContainer);
 
-setTimeout(() => {
-    let animations = TWF.syncTilesWeights();
-    console.log(animations);
-    TWF.runAnimationVector(animations, "callWeightChangeAnimationStep", 12).then(res => console.log(res));
-}, 1000);
+//@ts-ignore
+window.TWF = TWF;
+
+
+/*setTimeout(() => {
+let animations = TWF.syncTilesWeights();
+console.log(animations);
+TWF.runAnimationVector(animations, "callWeightChangeAnimationStep", 12).then(res => console.log(res));
+}, 1000); */

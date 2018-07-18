@@ -48,12 +48,25 @@ class PixiTile {
         this._col = 0;
         this.weightChangeAnimationCode = 0;
         this.weightChangeCode = "00";
-        this._WEIGHT_CHANGE_ANIMATION_FN = () => { };
 
-        //this.doubleValueFilter = new GlowFilter();
-        // this._SPRITE_OBJECT.filters = [this.doubleValueFilter];
 
     }
+    remove(): void {
+        this.graphicsType = null
+        this._GRAPHICS_OBJECT = null;
+        this.scaleFactor = null
+        this._SPRITE_OBJECT = null;
+
+        this._SLIDE_DATA = null;
+        this._TINT_ANIMATION_DATA = null;
+        this._GRAPHICS_ANIMATE_DATA = null;
+        this._TEXTURE_ANIMATION_DATA = null;
+        this._weight = null;
+        this._row = null;
+        this._col = null;
+        this.weightChangeAnimationCode = null;;
+        this.weightChangeCode = null;
+    };
     setSpriteScale() { };
     setSpriteMode(): void {
         this.graphicsType = mainGraphicType.Sprite;
@@ -131,20 +144,30 @@ class PixiTile {
         this._weight = 0;
         this.weightChangeCode = "00";
     };
+    resetWeights(): void {
+        this._weight = 0;
+        this.weightChangeCode = "00";
+    };
     set faceValue(v: number | string) {
         /**depending on graphicsType change one of the two */
         this._value = v;
+        let vaux = v !== null ? v : 0;
         if (this.graphicsType === mainGraphicType.Sprite) {
-            this._SPRITE_OBJECT.texture = this._TEXTURES_LIST[this._value as number];
+            this._SPRITE_OBJECT.texture = this._TEXTURES_LIST[vaux];
             /**tint to be reset too */
             this._SPRITE_OBJECT.tint = this.globalConfig.tileBackColor;
+            if (v === null) {
+                this._weight = 0;
+                this.weightChangeCode = "00";
+                this.weightChangeAnimationCode = 0;
+            }
         } else {
 
             let numberElement = (<PIXI.Graphics>this._GRAPHICS_OBJECT).children[0] as PIXI.Text;
 
-            if (v !== 0) {
+            if (v !== 0 && v !== null) {
                 numberElement.text = `${v}`;
-                numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[v] : this.globalConfig.negativeNumberColor;
+                numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[vaux] : this.globalConfig.negativeNumberColor;
                 numberElement.style.fontSize = this.globalConfig.fontSize;
                 numberElement.style.strokeThickness = this.globalConfig.strokeThicknessBase;
             } else {
@@ -180,7 +203,7 @@ class PixiTile {
         return this._weight;
     };
     set weight(w: WEIGHTS) {
-        //console.log(`setting W: ${this._weight} --> ${w}   value: ${this._value}  rc: ${this.row}-${this.col}`);
+        console.log(`setting W: ${this._weight} --> ${w}   value: ${this._value}  rc: ${this.row}-${this.col}`);
         if (w === null) {
             w = WEIGHTS.zero;
         }
@@ -209,13 +232,13 @@ class PixiTile {
         }
     };
     prepareWeightChangeAnimationFn(steps: number): boolean {
-        if (this._value === null) {
+        if (this._value === null || this._value === 0) {
             return false;
         }
         let weightChangeCode = this.weightChangeCode;
         this.weightChangeCode = "00";
         if (weightChangeCode == "00" || weightChangeCode == "11" || weightChangeCode == "22") {
-            //console.log("NO-WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
+            console.log("NO-WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
             return false;
         } else if (weightChangeCode == "01") {
             this.prepareAnimateTint(this.getBackTint(), steps);
@@ -239,7 +262,7 @@ class PixiTile {
             this.preapreAnimateDouble(steps, directionFB.backward);
             this.weightChangeAnimationCode = 2;
         }
-        //console.log("WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
+        console.log("WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
         return true;
     };
     callWeightChangeAnimationStep() {
@@ -257,7 +280,7 @@ class PixiTile {
 
     };
     preapreAnimateDouble(steps: number, dir: directionFB): void {
-        // console.log(this._value, this.faceValue, this.col, this.row, this._ANIMATION_TEXTURES[steps][this._value]);
+
         this._TEXTURE_ANIMATION_DATA.totalSteps = steps;
         this._TEXTURE_ANIMATION_DATA.direction = dir;
         this._TEXTURE_ANIMATION_DATA._index = dir === directionFB.forward ? 0 : steps - 1;
@@ -296,13 +319,15 @@ class PixiTile {
         this._TINT_ANIMATION_DATA.tintStep_GREEN = (tg - g) / steps;
         this._TINT_ANIMATION_DATA.tintStep_BLUE = (tb - b) / steps;
         this._TINT_ANIMATION_DATA.endTint = tint;
+
+
     };
     animateTintStep(): number {
 
         let _TINT_ANIMATION_DATA = this._TINT_ANIMATION_DATA;
         let objectToAnimate = _TINT_ANIMATION_DATA.objectToAnimate;
         if (_TINT_ANIMATION_DATA.currentStep === _TINT_ANIMATION_DATA.totalSteps - 1) {
-            // console.log("end animation tint", this._value, this._col, this._row);
+            console.log("end animation tint", this._value, this._col, this._row);
             (<PIXI.Graphics>objectToAnimate).tint = _TINT_ANIMATION_DATA.endTint;
             return 0;
         }

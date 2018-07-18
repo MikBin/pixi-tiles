@@ -5,10 +5,10 @@ import resolve from "rollup-plugin-node-resolve";
 import commonjs from "rollup-plugin-commonjs";
 
 export default {
-    input: "src/testTWF.ts",
+    input: "src/TorusViewBundle.ts",
     output: {
-        name: "testTWF",
-        file: "testTWF.js",
+        name: "TorusViewBundle",
+        file: "TorusViewBundle.js",
         format: "iife"
     },
     sourcemap: true,

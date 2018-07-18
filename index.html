@@ -29,19 +29,66 @@
         #game-play {
             width: 100%;
             height: 100%;
-
         }
     </style>
 </head>
 
 <body>
-    <div id="cont" style="width:100vw; height:100vw;">
+    <div id="cont" style="width:1024px; height:1024px;">
         <div id="game-play"></div>
     </div>
     <script src="node_modules/pixi.js/dist/pixi.min.js"></script>
-    <script src="node_modules/pixi-filters/dist/pixi-filters.js"></script>
+    <!-- <script src="node_modules/pixi-filters/dist/pixi-filters.js"></script> -->
     <script src="../torusUnfolded/src/js/gridModel.js"></script>
-    <script src="testTWF.js"></script>
+    <script src="TorusViewBundle.js"></script>
+    <script>
+        const canvasContainer = document.getElementById("game-play");
+        let torusSeed = `n9n9n9n9nr3c3`; //"110122020r3c3";
+        const torusModel = gridModel.GridFactory(torusSeed);
+        torusModel.setHistoryOn();
+        torusModel.valuate();
+let config={
+    marginPercent: 0.01,
+    fontSizePercent: 0.6,
+    doubleFontSizePercent: 0.7,
+    borderPercent: 0.12,
+    doubleBorderPercent: 0.40,
+    _16_9_MOD: 0.6,
+    containerHeightModifier: 0.6,
+    sizeNormalizer: 1.04,
+    fontSize: 0,
+    biggerFontSize: 0,
+    tileBackColor: 0xFAFAFA,
+    defaultAlpha: 1,
+    strokeThicknessBase: 0,
+    strokeThicknessDouble: 0,
+    roundBorderFactor: 0,
+    doubleBorderFactor: 0,
+    tileFullSize: 342,
+    tileSize: 0,
+    sourceTileTextureSize: 262,
+    tileNumberColors: [0xFAFAFA, 0x311B92, 0x0D47A1, 0x880E4F, 0x006064, 0xFF4500, 0x8B0000,
+        0x4B0082, 0x006400, 0x2F4F4F
+    ],
+    tileNumberBackColors: [0x0FAFAFA, 0x9781F8, 0x73ADFF, 0xEE74B5, 0x00dae4, 0xFFDE99,
+        0xff0c0c, 0x9403ff, 0x00e400, 0x95B5B5
+    ],
+    negativeNumberColor: 0x696969,
+    negativeBackNumberColor: 0xCCCCCC,
+    animationSteps: 12,
+    stepsFor_60_FPS: 12,
+    stepsLimit: 12,
+    margins: 0,
+    animationTiming: 200,
+    slideChangeThreshold: 20
+};
+        let TWF = new TorusViewBundle.TorusViewFactory(torusModel, canvasContainer,config);
+        let _resync = () => {
+            torusModel.reset();
+            torusModel.valuate();
+            TWF.resync();
+        };
+    </script>
 
 </body>
 

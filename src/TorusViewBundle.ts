@@ -138,7 +138,10 @@ export class TorusViewFactory {
     };
     private tilesMap: Object;
     private slideEndCode: string;
+    private animationTimingEMA: number;
     constructor(private torus, private canvasContainer: HTMLElement, private _configuration: graphicsConfiguration = Object.assign({}, MAIN_GRAPHICS_CONFIG), private playSlideSound: Function = () => { }, private publishScore: Function = () => { }) {
+
+        this.animationTimingEMA = _configuration.animationTiming;
 
         if (_configuration.tileFullSize === 0) {
             let w = window.innerWidth;
@@ -215,6 +218,23 @@ export class TorusViewFactory {
         this.PIXI_APP.stage.on('pointerdown', this.onDown.bind(this));
         this.PIXI_APP.stage.on('pointerup', this.onUp.bind(this));
 
+        this.PIXI_APP.ticker.stop();
+
+        this.runAnimationVector(this.syncTilesWeights(), "callWeightChangeAnimationStep", _configuration.animationSteps);
+
+    };
+    updateSlidesSteps(time: number): void {
+        let config = this._configuration;
+        let delta: number = time - config.animationTiming;
+        if (Math.abs(delta) > config.slideChangeThreshold) {
+            delta > 0 ? config.animationSteps-- : config.animationSteps++;
+        }
+        if (config.animationSteps > config.stepsLimit) {
+            config.animationSteps = config.stepsLimit;
+        } else if (config.animationSteps < 3) {
+            config.animationSteps = 3;
+        }
+        console.log(config.animationSteps, delta);
     };
     onDown(e): void {
         this.lastPointerDown.x = e.data.global.x;
@@ -237,12 +257,16 @@ export class TorusViewFactory {
             let colIdx = getColToSlide(e.data.global.x, this.lastPointerDown.x, this._configuration.tileFullSize);
             /*column*/
             this.playSlideSound();
+            let _p = Date.now();
             this.slideColumn(colIdx, direction).then((res) => {
 
                 this.publishScore(this.slideEndCode, this.torus.getData());
                 let animations = this.syncColTilesWeights(colIdx);
                 this.runAnimationVector(animations, "callWeightChangeAnimationStep", this._configuration.animationSteps).then((res) => {
+                    _p = Date.now() - _p;
+                    this.updateSlidesSteps(_p / 2);
                     this.SEMAPHORES.slide = true;
+
                 });
 
 
@@ -252,11 +276,15 @@ export class TorusViewFactory {
             /*rows*/
             let rowIdx = getRowToSlide(e.data.global.y, this.lastPointerDown.y, this._configuration.tileFullSize);
             this.playSlideSound();
+            let _p = Date.now();
             this.slideRow(rowIdx, direction).then((res) => {
                 this.publishScore(this.slideEndCode, this.torus.getData());
                 let animations = this.syncRowTilesWeights(rowIdx);
                 this.runAnimationVector(animations, "callWeightChangeAnimationStep", this._configuration.animationSteps).then((res) => {
+                    _p = Date.now() - _p;
+                    this.updateSlidesSteps(_p / 2);
                     this.SEMAPHORES.slide = true;
+
                 });
             });
 
@@ -371,8 +399,42 @@ export class TorusViewFactory {
         });
     };
     resize() { };
-    resync() { };
-    remove() { };
+    resync(): Promise<number> {
+        let tilesMap = this.tilesMap;
+        let torus = this.torus;
+        let rows = this.torus.rows;
+        let cols = this.torus.cols;
+
+        for (let i = 0; i < rows; ++i) {
+            for (let j = 0; j < cols; ++j) {
+                let v = torus.getValueRC(i, j);
+                let tile = tilesMap[i][j];
+                tile.faceValue = v;
+                tile.resetWeights();
+            }
+        }
+
+        return this.runAnimationVector(this.syncTilesWeights(), "callWeightChangeAnimationStep", this._configuration.animationSteps);
+    };
+    remove(): void {
+        this.PIXI_APP.renderer.destroy();
+        this.PIXI_APP.stage.destroy();
+        let tilesMap = this.tilesMap;
+        let rows = this.torus.rows;
+        let cols = this.torus.cols;
+        for (let i = 0; i < rows; ++i) {
+            for (let j = 0; j < cols; ++j) {
+
+                tilesMap[i][j].remove();
+
+            }
+        }
+
+        for (let p in this) {
+            this[p] = null;
+        }
+
+    };
     isTileOutBound(tileObj: PixiTile) {
 
         let ans = tileObj.row <= -1 || tileObj.col <= -1 || tileObj.row >= this.torus.rows || tileObj
@@ -381,6 +443,7 @@ export class TorusViewFactory {
         return ans;
     };
     resetTilePosition(tileObj: PixiTile) {
+        console.log(`reset tile position called for tile: ${tileObj.faceValue}-r:${tileObj.row}-c:${tileObj.col}`);
         let tileGraphics = tileObj.getObjectToUse();
         let conf = this._configuration;
         let rows: number = this.torus.rows;
@@ -414,7 +477,8 @@ export class TorusViewFactory {
     };
     slideRow(rowIdx: number, direction: number): Promise<number> {
         this.SEMAPHORES.slide = false;
-        // console.log(`slide row: ${rowIdx} -- ${direction}`)
+        console.log("---------------------------------------");
+        console.log(`slide row: ${rowIdx} -- ${direction}`)
         let conf = this._configuration;
         let torus = this.torus;
         let moveOf: number = this._configuration.tileFullSize;
@@ -440,22 +504,25 @@ export class TorusViewFactory {
 
         return this.runAnimationVector(animations, "slideStep", conf.animationSteps).then((res) => {
 
-            // console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.value);
+
             for (let i = 0; i < animations.length; ++i) {
                 let tileObj = animations[i];
-                //console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
+                console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
                 this.resetTilePosition(tileObj);
+
                 tilesMap[tileObj.row][tileObj.col] = tileObj;
                 if (this.isTileOutBound(tileObj)) {
                     tileObj.setOutside();
                 }
+                console.log("after reset position and setOUtisde?: ", tileObj.row, tileObj.col, tileObj.faceValue);
             }
 
             return res;
         });
     };
     slideColumn(colIdx: number, direction: number): Promise<number> {
-        //console.log(`slide row: ${colIdx} -- ${direction}`);
+        console.log("---------------------------------------");
+        console.log(`slide column: ${colIdx} -- ${direction}`);
         this.SEMAPHORES.slide = false;
         let conf = this._configuration;
         let torus = this.torus;
@@ -473,7 +540,7 @@ export class TorusViewFactory {
         torus.valuate();
         this.beforeSlideSetCol(colIdx, direction);
         let animations: PixiTile[] = [];
-        for (let i = -1; i <= torus.cols; ++i) {
+        for (let i = -1; i <= torus.rows; ++i) {
             tilesMap[i][colIdx].row += moveOfAbs;
             tilesMap[i][colIdx].slideOfPrepareFn(0, moveOf, conf.animationSteps);
             animations.push(tilesMap[i][colIdx]);
@@ -484,12 +551,13 @@ export class TorusViewFactory {
 
             for (let i = 0; i < animations.length; ++i) {
                 let tileObj = animations[i];
-                // console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
+                console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
                 this.resetTilePosition(tileObj);
                 tilesMap[tileObj.row][tileObj.col] = tileObj;
                 if (this.isTileOutBound(tileObj)) {
                     tileObj.setOutside();
                 }
+                console.log("after reset position and setOUtisde?: ", tileObj.row, tileObj.col, tileObj.faceValue);
             }
 
             return res;
@@ -613,7 +681,7 @@ export class TorusViewFactory {
             graphicsTilesMap[r][cols] = this.placeTileInContainer(r, cols, 0,
                 pixiContainer);
         });
-        //console.log("loggin tiles maep: ", this.tilesMap);
+        console.log("loggin tiles maep: ", this.tilesMap);
     };
     static buildAnimationTexturesList(_PIXI_APP: PIXI.Application, _main_graphics_config: graphicsConfiguration): Object {
 
@@ -734,5 +802,7 @@ console.time("textures");
 
     TEXTURES_GLOBAL.TILE_TEXTURES = TorusViewFactory.buildTilesTexturesList(PIXI_APP.renderer, config);
     TEXTURES_GLOBAL.ANIMATION_TEXTURES = TorusViewFactory.buildAnimationTexturesList(PIXI_APP, config);
+    PIXI_APP.renderer.destroy();
+    PIXI_APP.stage.destroy();
 })();
 console.timeEnd("textures");

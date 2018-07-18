@@ -1,4 +1,4 @@
-(function (PIXI$1) {
+var TorusViewBundle = (function (exports,PIXI$1) {
     'use strict';
 
     var directionFB;
@@ -41,8 +41,23 @@
             this._col = 0;
             this.weightChangeAnimationCode = 0;
             this.weightChangeCode = "00";
-            this._WEIGHT_CHANGE_ANIMATION_FN = () => { };
         }
+        remove() {
+            this.graphicsType = null;
+            this._GRAPHICS_OBJECT = null;
+            this.scaleFactor = null;
+            this._SPRITE_OBJECT = null;
+            this._SLIDE_DATA = null;
+            this._TINT_ANIMATION_DATA = null;
+            this._GRAPHICS_ANIMATE_DATA = null;
+            this._TEXTURE_ANIMATION_DATA = null;
+            this._weight = null;
+            this._row = null;
+            this._col = null;
+            this.weightChangeAnimationCode = null;
+            this.weightChangeCode = null;
+        }
+        ;
         setSpriteScale() { }
         ;
         setSpriteMode() {
@@ -128,17 +143,28 @@
             this.weightChangeCode = "00";
         }
         ;
+        resetWeights() {
+            this._weight = 0;
+            this.weightChangeCode = "00";
+        }
+        ;
         set faceValue(v) {
             this._value = v;
+            let vaux = v !== null ? v : 0;
             if (this.graphicsType === mainGraphicType.Sprite) {
-                this._SPRITE_OBJECT.texture = this._TEXTURES_LIST[this._value];
+                this._SPRITE_OBJECT.texture = this._TEXTURES_LIST[vaux];
                 this._SPRITE_OBJECT.tint = this.globalConfig.tileBackColor;
+                if (v === null) {
+                    this._weight = 0;
+                    this.weightChangeCode = "00";
+                    this.weightChangeAnimationCode = 0;
+                }
             }
             else {
                 let numberElement = this._GRAPHICS_OBJECT.children[0];
-                if (v !== 0) {
+                if (v !== 0 && v !== null) {
                     numberElement.text = `${v}`;
-                    numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[v] : this.globalConfig.negativeNumberColor;
+                    numberElement.style.fill = v > 0 ? this.globalConfig.tileNumberColors[vaux] : this.globalConfig.negativeNumberColor;
                     numberElement.style.fontSize = this.globalConfig.fontSize;
                     numberElement.style.strokeThickness = this.globalConfig.strokeThicknessBase;
                 }
@@ -183,6 +209,7 @@
         }
         ;
         set weight(w) {
+            console.log(`setting W: ${this._weight} --> ${w}   value: ${this._value}  rc: ${this.row}-${this.col}`);
             if (w === null) {
                 w = WEIGHTS.zero;
             }
@@ -221,12 +248,13 @@
         }
         ;
         prepareWeightChangeAnimationFn(steps) {
-            if (this._value === null) {
+            if (this._value === null || this._value === 0) {
                 return false;
             }
             let weightChangeCode = this.weightChangeCode;
             this.weightChangeCode = "00";
             if (weightChangeCode == "00" || weightChangeCode == "11" || weightChangeCode == "22") {
+                console.log("NO-WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
                 return false;
             }
             else if (weightChangeCode == "01") {
@@ -255,6 +283,7 @@
                 this.preapreAnimateDouble(steps, directionFB.backward);
                 this.weightChangeAnimationCode = 2;
             }
+            console.log("WCAC: ", this.row, this.col, this.faceValue, this.weightChangeAnimationCode, this.weightChangeCode);
             return true;
         }
         ;
@@ -310,6 +339,7 @@
             let _TINT_ANIMATION_DATA = this._TINT_ANIMATION_DATA;
             let objectToAnimate = _TINT_ANIMATION_DATA.objectToAnimate;
             if (_TINT_ANIMATION_DATA.currentStep === _TINT_ANIMATION_DATA.totalSteps - 1) {
+                console.log("end animation tint", this._value, this._col, this._row);
                 objectToAnimate.tint = _TINT_ANIMATION_DATA.endTint;
                 return 0;
             }
@@ -496,6 +526,7 @@
             this._configuration = _configuration;
             this.playSlideSound = playSlideSound;
             this.publishScore = publishScore;
+            this.animationTimingEMA = _configuration.animationTiming;
             if (_configuration.tileFullSize === 0) {
                 let w = window.innerWidth;
                 let h = window.innerHeight;
@@ -551,6 +582,23 @@
             this.buildStartTiles();
             this.PIXI_APP.stage.on('pointerdown', this.onDown.bind(this));
             this.PIXI_APP.stage.on('pointerup', this.onUp.bind(this));
+            this.PIXI_APP.ticker.stop();
+            this.runAnimationVector(this.syncTilesWeights(), "callWeightChangeAnimationStep", _configuration.animationSteps);
+        }
+        ;
+        updateSlidesSteps(time) {
+            let config = this._configuration;
+            let delta = time - config.animationTiming;
+            if (Math.abs(delta) > config.slideChangeThreshold) {
+                delta > 0 ? config.animationSteps-- : config.animationSteps++;
+            }
+            if (config.animationSteps > config.stepsLimit) {
+                config.animationSteps = config.stepsLimit;
+            }
+            else if (config.animationSteps < 3) {
+                config.animationSteps = 3;
+            }
+            console.log(config.animationSteps, delta);
         }
         ;
         onDown(e) {
@@ -569,10 +617,13 @@
             if (direction > 1) {
                 let colIdx = getColToSlide(e.data.global.x, this.lastPointerDown.x, this._configuration.tileFullSize);
                 this.playSlideSound();
+                let _p = Date.now();
                 this.slideColumn(colIdx, direction).then((res) => {
                     this.publishScore(this.slideEndCode, this.torus.getData());
                     let animations = this.syncColTilesWeights(colIdx);
                     this.runAnimationVector(animations, "callWeightChangeAnimationStep", this._configuration.animationSteps).then((res) => {
+                        _p = Date.now() - _p;
+                        this.updateSlidesSteps(_p / 2);
                         this.SEMAPHORES.slide = true;
                     });
                 });
@@ -580,10 +631,13 @@
             else {
                 let rowIdx = getRowToSlide(e.data.global.y, this.lastPointerDown.y, this._configuration.tileFullSize);
                 this.playSlideSound();
+                let _p = Date.now();
                 this.slideRow(rowIdx, direction).then((res) => {
                     this.publishScore(this.slideEndCode, this.torus.getData());
                     let animations = this.syncRowTilesWeights(rowIdx);
                     this.runAnimationVector(animations, "callWeightChangeAnimationStep", this._configuration.animationSteps).then((res) => {
+                        _p = Date.now() - _p;
+                        this.updateSlidesSteps(_p / 2);
                         this.SEMAPHORES.slide = true;
                     });
                 });
@@ -696,9 +750,37 @@
         ;
         resize() { }
         ;
-        resync() { }
+        resync() {
+            let tilesMap = this.tilesMap;
+            let torus = this.torus;
+            let rows = this.torus.rows;
+            let cols = this.torus.cols;
+            for (let i = 0; i < rows; ++i) {
+                for (let j = 0; j < cols; ++j) {
+                    let v = torus.getValueRC(i, j);
+                    let tile = tilesMap[i][j];
+                    tile.faceValue = v;
+                    tile.resetWeights();
+                }
+            }
+            return this.runAnimationVector(this.syncTilesWeights(), "callWeightChangeAnimationStep", this._configuration.animationSteps);
+        }
         ;
-        remove() { }
+        remove() {
+            this.PIXI_APP.renderer.destroy();
+            this.PIXI_APP.stage.destroy();
+            let tilesMap = this.tilesMap;
+            let rows = this.torus.rows;
+            let cols = this.torus.cols;
+            for (let i = 0; i < rows; ++i) {
+                for (let j = 0; j < cols; ++j) {
+                    tilesMap[i][j].remove();
+                }
+            }
+            for (let p in this) {
+                this[p] = null;
+            }
+        }
         ;
         isTileOutBound(tileObj) {
             let ans = tileObj.row <= -1 || tileObj.col <= -1 || tileObj.row >= this.torus.rows || tileObj
@@ -707,6 +789,7 @@
         }
         ;
         resetTilePosition(tileObj) {
+            console.log(`reset tile position called for tile: ${tileObj.faceValue}-r:${tileObj.row}-c:${tileObj.col}`);
             let tileGraphics = tileObj.getObjectToUse();
             let conf = this._configuration;
             let rows = this.torus.rows;
@@ -739,6 +822,8 @@
         ;
         slideRow(rowIdx, direction) {
             this.SEMAPHORES.slide = false;
+            console.log("---------------------------------------");
+            console.log(`slide row: ${rowIdx} -- ${direction}`);
             let conf = this._configuration;
             let torus = this.torus;
             let moveOf = this._configuration.tileFullSize;
@@ -764,17 +849,21 @@
             return this.runAnimationVector(animations, "slideStep", conf.animationSteps).then((res) => {
                 for (let i = 0; i < animations.length; ++i) {
                     let tileObj = animations[i];
+                    console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
                     this.resetTilePosition(tileObj);
                     tilesMap[tileObj.row][tileObj.col] = tileObj;
                     if (this.isTileOutBound(tileObj)) {
                         tileObj.setOutside();
                     }
+                    console.log("after reset position and setOUtisde?: ", tileObj.row, tileObj.col, tileObj.faceValue);
                 }
                 return res;
             });
         }
         ;
         slideColumn(colIdx, direction) {
+            console.log("---------------------------------------");
+            console.log(`slide column: ${colIdx} -- ${direction}`);
             this.SEMAPHORES.slide = false;
             let conf = this._configuration;
             let torus = this.torus;
@@ -792,7 +881,7 @@
             torus.valuate();
             this.beforeSlideSetCol(colIdx, direction);
             let animations = [];
-            for (let i = -1; i <= torus.cols; ++i) {
+            for (let i = -1; i <= torus.rows; ++i) {
                 tilesMap[i][colIdx].row += moveOfAbs;
                 tilesMap[i][colIdx].slideOfPrepareFn(0, moveOf, conf.animationSteps);
                 animations.push(tilesMap[i][colIdx]);
@@ -800,11 +889,13 @@
             return this.runAnimationVector(animations, "slideStep", conf.animationSteps).then((res) => {
                 for (let i = 0; i < animations.length; ++i) {
                     let tileObj = animations[i];
+                    console.log("slide ended for tile: ", tileObj.row, tileObj.col, tileObj.faceValue);
                     this.resetTilePosition(tileObj);
                     tilesMap[tileObj.row][tileObj.col] = tileObj;
                     if (this.isTileOutBound(tileObj)) {
                         tileObj.setOutside();
                     }
+                    console.log("after reset position and setOUtisde?: ", tileObj.row, tileObj.col, tileObj.faceValue);
                 }
                 return res;
             });
@@ -921,6 +1012,7 @@
                 });
                 graphicsTilesMap[r][cols] = this.placeTileInContainer(r, cols, 0, pixiContainer);
             });
+            console.log("loggin tiles maep: ", this.tilesMap);
         }
         ;
         static buildAnimationTexturesList(_PIXI_APP, _main_graphics_config) {
@@ -1024,19 +1116,15 @@
         TorusViewFactory.setMainGraphicsConfig(262, config);
         TEXTURES_GLOBAL.TILE_TEXTURES = TorusViewFactory.buildTilesTexturesList(PIXI_APP.renderer, config);
         TEXTURES_GLOBAL.ANIMATION_TEXTURES = TorusViewFactory.buildAnimationTexturesList(PIXI_APP, config);
+        PIXI_APP.renderer.destroy();
+        PIXI_APP.stage.destroy();
     })();
     console.timeEnd("textures");
 
-    const canvasContainer = document.getElementById("game-play");
-    const torusModel = gridModel.GridFactory("44440n406066n60n0606550n550n5nnnn10n11n12n2n2n2n0r7c7");
-    torusModel.setHistoryOn();
-    torusModel.valuate();
-    let TWF = new TorusViewFactory(torusModel, canvasContainer);
-    setTimeout(() => {
-        let animations = TWF.syncTilesWeights();
-        console.log(animations);
-        TWF.runAnimationVector(animations, "callWeightChangeAnimationStep", 12).then(res => console.log(res));
-    }, 1000);
+    exports.MAIN_GRAPHICS_CONFIG = MAIN_GRAPHICS_CONFIG;
+    exports.TorusViewFactory = TorusViewFactory;
 
-}(PIXI));
-//# sourceMappingURL=testTWF.js.map
+    return exports;
+
+}({},PIXI));
+//# sourceMappingURL=TorusViewBundle.js.map
